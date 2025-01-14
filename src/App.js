@@ -23,7 +23,7 @@ const hangmanStages = [
   "Head, Body, Left Arm", // Left Arm
   "Head, Body, Left Arm, Right Arm", // Right Arm
   "Head, Body, Left Arm, Right Arm, Left Leg", // Left Leg
-  "Head, Body, Left Arm, Right Arm, Left Leg, Right Leg", // Full Hangman
+  "Head, Body, Left Arm, Right Arm, Left Leg, Right Leg" // Full Hangman
 ];
 
 const App = () => {
@@ -34,6 +34,7 @@ const App = () => {
   const [message, setMessage] = useState("");
   const [showAnswer, setShowAnswer] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(10);
 
   useEffect(() => {
     if (darkMode) {
@@ -51,12 +52,41 @@ const App = () => {
   }, [lives]);
 
   useEffect(() => {
-    if (wordData.word.split("").every((letter) => chosenLetters.includes(letter))) {
+    if (lives > 0 && wordData.word.split("").every((letter) => chosenLetters.includes(letter))) {
       setMessage("Congratulations! You guessed the word correctly!");
+      setShowAnswer(true);
+      setHints((prev) => prev + 1); // Add a hint when the word is guessed correctly
     }
-  }, [chosenLetters, wordData.word]);
+  }, [chosenLetters, wordData.word, lives]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeLeft((prevTimeLeft) => {
+        if (prevTimeLeft > 1) {
+          return prevTimeLeft - 1;
+        } else {
+          setLives((prevLives) => {
+            if (prevLives > 0) {
+              return prevLives - 1;
+            } else {
+              clearInterval(timer);
+              return prevLives;
+            }
+          });
+          return 10;
+        }
+      });
+    }, 1000); // Decrease time left every second
+
+    if (lives === 0 || (lives > 0 && wordData.word.split("").every((letter) => chosenLetters.includes(letter)))) {
+      clearInterval(timer);
+    }
+
+    return () => clearInterval(timer);
+  }, [lives, chosenLetters, wordData.word]);
 
   const handleLetterClick = (letter) => {
+    if (lives === 0 || showAnswer) return; // Prevent typing when game is over
     if (!chosenLetters.includes(letter)) {
       setChosenLetters((prev) => [...prev, letter]);
       if (!wordData.word.includes(letter)) {
@@ -81,9 +111,9 @@ const App = () => {
     setWordData(getRandomWord());
     setChosenLetters([]);
     setLives(6);
-    setHints(3);
     setMessage("");
     setShowAnswer(false);
+    setTimeLeft(10);
   };
 
   const renderKeyboard = () => {
@@ -102,7 +132,7 @@ const App = () => {
             <button
               key={letter}
               onClick={() => handleLetterClick(letter)}
-              disabled={isSelected}
+              disabled={isSelected || lives === 0 || showAnswer} // Disable buttons when game is over
               className={`m-1 p-2 w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 flex items-center justify-center border rounded-full transition-all font-semibold text-white active:scale-95 ${buttonColor} ${isSelected ? "cursor-not-allowed" : ""}`}
             >
               {letter}
@@ -114,6 +144,7 @@ const App = () => {
   };
 
   const renderHangman = () => {
+    if (!wordData) return null; // Add this check
     const stage = hangmanStages[6 - lives];
     return (
       <div className="flex justify-center items-center mb-6">
@@ -132,20 +163,20 @@ const App = () => {
           <line x1="8" y1="2" x2="16" y2="2" stroke="currentColor" strokeWidth="2" /> {/* Top */}
           <line x1="16" y1="2" x2="16" y2="4" stroke="currentColor" strokeWidth="2" /> {/* Rope */}
           {stage.includes("Head") && (
-            <circle cx="16" cy="6" r="2" stroke="currentColor" strokeWidth="2" fill="none" />
+            <circle cx="16" cy="6" r="2" stroke="currentColor" strokeWidth="1" fill="none" />
           )} {/* Head */}
-          {stage.includes("Body") && <line x1="16" y1="8" x2="16" y2="14" stroke="currentColor" strokeWidth="2" />} {/* Body */}
+          {stage.includes("Body") && <line x1="16" y1="8" x2="16" y2="14" stroke="currentColor" strokeWidth="1" />} {/* Body */}
           {stage.includes("Left Arm") && (
-            <line x1="16" y1="10" x2="14" y2="12" stroke="currentColor" strokeWidth="2" />
+            <line x1="16" y1="10" x2="14" y2="12" stroke="currentColor" strokeWidth="1" />
           )} {/* Left Arm */}
           {stage.includes("Right Arm") && (
-            <line x1="16" y1="10" x2="18" y2="12" stroke="currentColor" strokeWidth="2" />
+            <line x1="16" y1="10" x2="18" y2="12" stroke="currentColor" strokeWidth="1" />
           )} {/* Right Arm */}
           {stage.includes("Left Leg") && (
-            <line x1="16" y1="14" x2="15" y2="18" stroke="currentColor" strokeWidth="2" />
+            <line x1="16" y1="14" x2="15" y2="18" stroke="currentColor" strokeWidth="1" />
           )} {/* Left Leg */}
           {stage.includes("Right Leg") && (
-            <line x1="16" y1="14" x2="17" y2="18" stroke="currentColor" strokeWidth="2" />
+            <line x1="16" y1="14" x2="17" y2="18" stroke="currentColor" strokeWidth="1" />
           )} {/* Right Leg */}
         </svg>
       </div>
@@ -185,15 +216,34 @@ const App = () => {
       </h1>
 
       <div className="relative border-4 border-blue-500 dark:border-blue-400 rounded-xl w-full max-w-2xl p-4 md:p-6">
+        <div className="absolute top-4 right-4 text-lg font-bold text-blue-500 dark:text-blue-400">
+          Time left: {timeLeft}s
+        </div>
         {renderHangman()}
         {renderWordBoxes()}
 
-        <div className="mb-4">{renderKeyboard()}</div>
+        <p className="italic text-center text-sm md:text-base mb-4">
+          <span className="font-semibold text-blue-500 dark:text-blue-400">Hint:</span>{" "}
+          <span className="text-blue-900 dark:text-gray-300">{wordData.description}</span>
+        </p>
 
-        <div className="text-center mt-6 font-medium text-blue-900 dark:text-gray-300 text-sm">
-          <span className="text-blue-500 font-bold dark:text-blue-400">{hints}</span> hint
-          {hints !== 1 ? "s" : ""} remaining
-        </div>
+        {message && (
+          <div
+            className={`mb-4 text-center text-sm md:text-lg font-semibold px-4 py-3 rounded shadow-md ${
+              message.includes("Congratulations")
+                ? "bg-green-100 text-green-800 border-l-4 border-green-600 dark:bg-green-800 dark:text-green-200 dark:border-green-500"
+                : "bg-red-100 text-red-800 border-l-4 border-red-600 dark:bg-red-800 dark:text-red-200 dark:border-red-500"
+            }`}
+          >
+            {message}
+            {showAnswer && (
+              <div className="mt-2 text-blue-600 dark:text-blue-400 text-sm">
+                <p className="font-semibold">Correct word was:</p>
+                <p className="text-lg font-bold">{wordData.word}</p>
+              </div>
+            )}
+          </div>
+        )}
 
         <button
           onClick={handleHint}
@@ -222,6 +272,13 @@ const App = () => {
             />
           </svg>
         </button>
+
+        <div className="text-center mt-6 font-medium text-blue-900 dark:text-gray-300 text-sm">
+          <span className="text-blue-500 font-bold dark:text-blue-400">{hints}</span> hint
+          {hints !== 1 ? "s" : ""} remaining
+        </div>
+
+        <div className="mb-4">{renderKeyboard()}</div>
 
         <div className="flex justify-center">
           <button
