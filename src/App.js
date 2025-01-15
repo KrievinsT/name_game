@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 const sampleWords = [
   { word: "HELLO", description: "A common greeting to say hi." },
@@ -35,6 +35,14 @@ const App = () => {
   const [showAnswer, setShowAnswer] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [timeLeft, setTimeLeft] = useState(10);
+  const [musicEnabled, setMusicEnabled] = useState(true);
+  const [score, setScore] = useState(0);
+
+  // Audio Refs
+  const correctAudio = useRef(new Audio("/sounds/correct.mp3"));
+  const wrongAudio = useRef(new Audio("/sounds/wronganswer-377702.mp3"));
+  const backgroundAudio = useRef(new Audio("/sounds/background.mp3"));
+  const guessedWordAudio = useRef(new Audio("/sounds/correct-6033.mp3"));
 
   useEffect(() => {
     if (darkMode) {
@@ -56,6 +64,9 @@ const App = () => {
       setMessage("Congratulations! You guessed the word correctly!");
       setShowAnswer(true);
       setHints((prev) => prev + 1); // Add a hint when the word is guessed correctly
+      guessedWordAudio.current.play().catch((error) => {
+        console.log("Audio play failed:", error);
+      }); // Play guessed word audio
     }
   }, [chosenLetters, wordData.word, lives]);
 
@@ -85,11 +96,41 @@ const App = () => {
     return () => clearInterval(timer);
   }, [lives, chosenLetters, wordData.word]);
 
+  // Play background music
+  useEffect(() => {
+    const audio = backgroundAudio.current;
+    if (musicEnabled) {
+      audio.loop = true;
+      audio.volume = 0.5;
+      audio.play().catch((error) => {
+        console.log("Audio play failed:", error);
+      });
+    } else {
+      audio.pause();
+    }
+
+    return () => {
+      audio.pause();
+      audio.currentTime = 0;
+    };
+  }, [musicEnabled]);
+
   const handleLetterClick = (letter) => {
     if (lives === 0 || showAnswer) return; // Prevent typing when game is over
+
     if (!chosenLetters.includes(letter)) {
       setChosenLetters((prev) => [...prev, letter]);
-      if (!wordData.word.includes(letter)) {
+
+      if (wordData.word.includes(letter)) {
+        correctAudio.current.play().catch((error) => {
+          console.log("Audio play failed:", error);
+        }); // Play correct sound
+        setScore((prev) => prev + 10); // Add 10 points for correct guesses
+      } else {
+        wrongAudio.current.play().catch((error) => {
+          console.log("Audio play failed:", error);
+        }); // Play incorrect sound
+        setScore((prev) => prev - 5); // Deduct 5 points for wrong guesses
         setLives((prev) => prev - 1);
       }
     }
@@ -114,6 +155,11 @@ const App = () => {
     setMessage("");
     setShowAnswer(false);
     setTimeLeft(10);
+    setScore(0); // Reset score
+  };
+
+  const toggleMusic = () => {
+    setMusicEnabled((prev) => !prev);
   };
 
   const renderKeyboard = () => {
@@ -211,6 +257,13 @@ const App = () => {
         {darkMode ? "Light Mode" : "Dark Mode"}
       </button>
 
+      <button
+        onClick={toggleMusic}
+        className="absolute top-4 left-4 bg-blue-200 dark:bg-blue-700 text-blue-800 dark:text-blue-200 px-4 py-2 rounded-full transition-all"
+      >
+        {musicEnabled ? "Mute Music" : "Play Music"}
+      </button>
+
       <h1 className="text-center text-3xl md:text-4xl font-extrabold mb-6 tracking-wide bg-clip-text text-transparent bg-blue-600 dark:bg-blue-400">
         Word Guess Game
       </h1>
@@ -218,6 +271,9 @@ const App = () => {
       <div className="relative border-4 border-blue-500 dark:border-blue-400 rounded-xl w-full max-w-2xl p-4 md:p-6">
         <div className="absolute top-4 right-4 text-lg font-bold text-blue-500 dark:text-blue-400">
           Time left: {timeLeft}s
+        </div>
+        <div className="absolute top-4 left-4 text-lg font-bold text-blue-500 dark:text-blue-400">
+          Score: {score}
         </div>
         {renderHangman()}
         {renderWordBoxes()}
