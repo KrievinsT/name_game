@@ -34,13 +34,13 @@ const App = () => {
   const [message, setMessage] = useState("");
   const [showAnswer, setShowAnswer] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(10);
+  const [timeLeft, setTimeLeft] = useState(30);
   const [musicEnabled, setMusicEnabled] = useState(true);
   const [score, setScore] = useState(0);
 
   // Audio Refs
   const correctAudio = useRef(new Audio("/sounds/correct.mp3"));
-  const wrongAudio = useRef(new Audio("/sounds/wronganswer-377702.mp3"));
+  const wrongAudio = useRef(new Audio(process.env.PUBLIC_URL + "/sounds/wronganswer.mp3"));
   const backgroundAudio = useRef(new Audio("/sounds/background.mp3"));
   const guessedWordAudio = useRef(new Audio("/sounds/correct-6033.mp3"));
 
@@ -56,17 +56,22 @@ const App = () => {
     if (lives === 0) {
       setMessage("Game Over! The hangman is complete.");
       setShowAnswer(true);
+  
+      // Play Game Over Sound
+      wrongAudio.current.play().catch((error) => {
+        console.log("Audio play failed:", error);
+      });
     }
-  }, [lives]);
+  }, [lives]);  
 
   useEffect(() => {
     if (lives > 0 && wordData.word.split("").every((letter) => chosenLetters.includes(letter))) {
       setMessage("Congratulations! You guessed the word correctly!");
       setShowAnswer(true);
-      setHints((prev) => prev + 1); // Add a hint when the word is guessed correctly
+      setHints((prev) => prev + 1); // Add a hint when the word is guessed
       guessedWordAudio.current.play().catch((error) => {
         console.log("Audio play failed:", error);
-      }); // Play guessed word audio
+      });
     }
   }, [chosenLetters, wordData.word, lives]);
 
@@ -84,10 +89,10 @@ const App = () => {
               return prevLives;
             }
           });
-          return 10;
+          return 30;
         }
       });
-    }, 1000); // Decrease time left every second
+    }, 1000);
 
     if (lives === 0 || (lives > 0 && wordData.word.split("").every((letter) => chosenLetters.includes(letter)))) {
       clearInterval(timer);
@@ -96,27 +101,36 @@ const App = () => {
     return () => clearInterval(timer);
   }, [lives, chosenLetters, wordData.word]);
 
-  // Play background music
   useEffect(() => {
     const audio = backgroundAudio.current;
-    if (musicEnabled) {
-      audio.loop = true;
-      audio.volume = 0.5;
-      audio.play().catch((error) => {
-        console.log("Audio play failed:", error);
+    audio.loop = true;
+    audio.volume = 0.5;
+
+    const playMusic = () => {
+      audio.play().then(() => {
+        setMusicEnabled(true);
+      }).catch((error) => {
+        console.log("Audio play blocked by browser:", error);
+        setMusicEnabled(false);
       });
+      document.removeEventListener("click", playMusic);
+    };
+
+    if (musicEnabled) {
+      document.addEventListener("click", playMusic);
     } else {
       audio.pause();
     }
-
+  
     return () => {
       audio.pause();
       audio.currentTime = 0;
+      document.removeEventListener("click", playMusic);
     };
-  }, [musicEnabled]);
+  }, [musicEnabled]);  
 
   const handleLetterClick = (letter) => {
-    if (lives === 0 || showAnswer) return; // Prevent typing when game is over
+    if (lives === 0 || showAnswer) return;
 
     if (!chosenLetters.includes(letter)) {
       setChosenLetters((prev) => [...prev, letter]);
@@ -154,7 +168,7 @@ const App = () => {
     setLives(6);
     setMessage("");
     setShowAnswer(false);
-    setTimeLeft(10);
+    setTimeLeft(30);
     setScore(0); // Reset score
   };
 
